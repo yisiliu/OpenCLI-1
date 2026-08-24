@@ -60,6 +60,12 @@ describe('output TTY detection', () => {
     expect(out).not.toContain('| markdown |');
   });
 
+  it('renders embedded newlines as <br> so markdown rows stay intact', () => {
+    render([{ title: 'a\nb', url: 'u' }], { fmt: 'md' });
+    const out = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(out).toContain('| a<br>b | u |');
+  });
+
   it('escapes pipe characters in markdown table cells', () => {
     render([{ name: 'a|b', score: 10 }], { fmt: 'md', columns: ['name', 'score'] });
     const out = logSpy.mock.calls.map((c: unknown[]) => c[0]).join('\n');

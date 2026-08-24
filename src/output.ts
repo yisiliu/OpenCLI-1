@@ -124,7 +124,10 @@ function renderMarkdown(data: unknown, opts: RenderOptions): void {
   console.log('| ' + columns.join(' | ') + ' |');
   console.log('| ' + columns.map(() => '---').join(' | ') + ' |');
   for (const row of rows) {
-    console.log('| ' + columns.map(c => String((row as Record<string, unknown>)[c] ?? '').replace(/\|/g, '\\|')).join(' | ') + ' |');
+    console.log('| ' + columns.map(c => String((row as Record<string, unknown>)[c] ?? '')
+      .replace(/\|/g, '\\|')
+      // A raw newline terminates the markdown table row; render it as <br>.
+      .replace(/\r?\n/g, '<br>')).join(' | ') + ' |');
   }
 }
 
