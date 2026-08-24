@@ -415,7 +415,9 @@ export async function waitForSubmittedJobsAfter(
   const historyPageSize = Math.min(100, Math.max(20, expectedCount));
   let ambiguousIds = [];
   let consecutivePollFailures = 0;
-  while (Date.now() < deadline) {
+  // Always poll at least once: a tiny timeout (or a slow first tick) must not
+  // report a timeout without ever having looked at the job history.
+  do {
     let recent = [];
     try {
       recent = await fetchHistory(page, userId, historyPageSize);
@@ -449,8 +451,9 @@ export async function waitForSubmittedJobsAfter(
         .map((row) => String(row.id).toLowerCase());
     }
     if (matching.length > expectedCount) ambiguousIds = matching.map((row) => String(row.id).toLowerCase());
+    if (Date.now() >= deadline) break;
     await page.wait(1.5);
-  }
+  } while (Date.now() < deadline);
   if (ambiguousIds.length > expectedCount) {
     throw new CommandExecutionError(
       `Midjourney submission is ambiguous; ${ambiguousIds.length} new jobs matched the prompt`,
