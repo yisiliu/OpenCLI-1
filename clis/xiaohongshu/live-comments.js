@@ -72,7 +72,7 @@ export function buildLiveWatcherDrainJs() {
   `;
 }
 
-function parseRoomUrl(raw) {
+export function parseRoomUrl(raw) {
     const input = String(raw ?? '').trim();
     if (/^\d{6,}$/.test(input)) {
         return `https://www.xiaohongshu.com/livestream/${input}`;
