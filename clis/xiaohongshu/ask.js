@@ -146,7 +146,7 @@ export function buildNoteUrl(noteId, xsecToken) {
     const url = new URL(`https://${XHS_WEB_HOST}/explore/${noteId}`);
     if (xsecToken) {
         url.searchParams.set('xsec_token', xsecToken);
-        url.searchParams.set('xsec_source', '');
+        url.searchParams.set('xsec_source', 'pc_share');
     }
     return url.toString();
 }
