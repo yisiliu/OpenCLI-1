@@ -196,6 +196,7 @@ function createFilterBehaviorPage(options = {}) {
     const page = createPageMock([]);
     page.evaluate.mockImplementation(async (script) => {
         const source = String(script);
+        if (source.includes('location.reload')) return undefined;
         if (source.includes('findNoteCard')) return 'content';
         if (source.includes('const requestedFilters =')) {
             return Function(
@@ -1052,5 +1053,43 @@ describe('noteIdToDate (ObjectID timestamp parsing)', () => {
     it('returns empty string when timestamp is out of range', () => {
         // All zeros → ts = 0
         expect(noteIdToDate('https://www.xiaohongshu.com/search_result/000000000000000000000000')).toBe('');
+    });
+});
+
+describe('xiaohongshu search warm-tab freshness', () => {
+    it('forces a reload when the persistent tab already shows this exact search URL', async () => {
+        vi.useFakeTimers();
+        try {
+            const page = createFilterBehaviorPage();
+            page.getCurrentUrl = vi.fn().mockResolvedValue(
+                'https://www.xiaohongshu.com/search_result?keyword=test&source=web_search_result_notes',
+            );
+            const reloadCalls = () => page.evaluate.mock.calls.filter(([s]) => String(s).includes('location.reload')).length;
+            // The filter fixture's URL is baked as keyword=test; run the same query.
+            const result = await runFilterCommand(page, { query: 'test' });
+            expect(result.length).toBeGreaterThan(0);
+            expect(page.goto).not.toHaveBeenCalled();
+            expect(reloadCalls()).toBe(1);
+        }
+        finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('navigates normally for a different query URL', async () => {
+        vi.useFakeTimers();
+        try {
+            const page = createFilterBehaviorPage();
+            page.getCurrentUrl = vi.fn().mockResolvedValue(
+                'https://www.xiaohongshu.com/search_result?keyword=other&source=web_search_result_notes',
+            );
+            await runFilterCommand(page, { query: 'test' });
+            expect(page.goto).toHaveBeenCalledWith(
+                'https://www.xiaohongshu.com/search_result?keyword=test&source=web_search_result_notes',
+            );
+        }
+        finally {
+            vi.useRealTimers();
+        }
     });
 });

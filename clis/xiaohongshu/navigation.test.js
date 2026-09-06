@@ -65,6 +65,11 @@ describe('xiaohongshu siteSession phase boundary', () => {
         'xiaohongshu/user',
         'xiaohongshu/saved',
         'xiaohongshu/liked',
+        // Phase 3: search — its replaceCollapsedTab recovery is safe under a
+        // persistent session (the extension rebinds preferredTabId on tab
+        // create BEFORE the old tab closes), and navigateFresh handles the
+        // repeated-same-query fast-path.
+        'xiaohongshu/search',
     ];
     it.each(persistent)('%s opts into the persistent site session', (name) => {
         const cmd = getRegistry().get(name);
@@ -77,7 +82,6 @@ describe('xiaohongshu siteSession phase boundary', () => {
     // capture trio needs navigation to fire signed XHRs; publish/delete-note
     // and the draft commands would inherit a dirty composer.
     const ephemeral = [
-        'xiaohongshu/search',
         'xiaohongshu/publish',
         'xiaohongshu/delete-note',
         'xiaohongshu/drafts',

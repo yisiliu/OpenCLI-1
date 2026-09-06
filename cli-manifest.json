@@ -46350,7 +46350,8 @@
     "type": "js",
     "modulePath": "xiaohongshu/search.js",
     "sourceFile": "xiaohongshu/search.js",
-    "navigateBefore": false
+    "navigateBefore": false,
+    "siteSession": "persistent"
   },
   {
     "site": "xiaohongshu",
