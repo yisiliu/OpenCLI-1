@@ -14,7 +14,7 @@
  */
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import { ArgumentError, CommandExecutionError, EmptyResultError } from '@jackwener/opencli/errors';
-import { unwrapEvaluateResult } from './shared.js';
+import { navigateFresh, unwrapEvaluateResult } from './shared.js';
 
 function parseLimit(raw) {
     const parsed = Number(raw ?? 20);
@@ -96,7 +96,10 @@ export function buildFeedNoteUrl(webHost, id, xsecToken) {
  */
 export async function runFeed(page, kwargs, webHost) {
     const limit = parseLimit(kwargs.limit);
-    await page.goto(`https://${webHost}/explore`);
+    // A warm persistent tab parked on /explore serves the identical hydrated
+    // feed forever if navigation fast-paths (observed live). Feed exists to
+    // deliver fresh content; force a real page load every time.
+    await navigateFresh(page, `https://${webHost}/explore`);
     // Pinia store hydrates from SSR; give the page a beat to finish
     // bootstrapping before reading the array.
     await page.wait({ time: 2 });
@@ -149,6 +152,7 @@ export const command = cli({
     strategy: Strategy.COOKIE,
     browser: true,
     navigateBefore: false,
+    siteSession: 'persistent',
     args: [
         { name: 'limit', type: 'int', default: 20, help: 'Number of items to return' },
     ],

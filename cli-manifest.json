@@ -45986,7 +45986,8 @@
     "type": "js",
     "modulePath": "xiaohongshu/feed.js",
     "sourceFile": "xiaohongshu/feed.js",
-    "navigateBefore": false
+    "navigateBefore": false,
+    "siteSession": "persistent"
   },
   {
     "site": "xiaohongshu",
@@ -46051,7 +46052,8 @@
     "type": "js",
     "modulePath": "xiaohongshu/liked.js",
     "sourceFile": "xiaohongshu/liked.js",
-    "navigateBefore": false
+    "navigateBefore": false,
+    "siteSession": "persistent"
   },
   {
     "site": "xiaohongshu",
@@ -46246,7 +46248,8 @@
     "type": "js",
     "modulePath": "xiaohongshu/saved.js",
     "sourceFile": "xiaohongshu/saved.js",
-    "navigateBefore": false
+    "navigateBefore": false,
+    "siteSession": "persistent"
   },
   {
     "site": "xiaohongshu",
@@ -46411,7 +46414,8 @@
     "type": "js",
     "modulePath": "xiaohongshu/user.js",
     "sourceFile": "xiaohongshu/user.js",
-    "navigateBefore": false
+    "navigateBefore": false,
+    "siteSession": "persistent"
   },
   {
     "site": "xiaohongshu",

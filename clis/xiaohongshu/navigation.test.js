@@ -59,6 +59,12 @@ describe('xiaohongshu siteSession phase boundary', () => {
         'xiaohongshu/creator-stats',
         'xiaohongshu/follow',
         'xiaohongshu/unfollow',
+        // Phase 2: page-state readers, converted WITH staleness handling —
+        // navigateFresh forces a real reload on a warm same-URL tab.
+        'xiaohongshu/feed',
+        'xiaohongshu/user',
+        'xiaohongshu/saved',
+        'xiaohongshu/liked',
     ];
     it.each(persistent)('%s opts into the persistent site session', (name) => {
         const cmd = getRegistry().get(name);
@@ -67,16 +73,11 @@ describe('xiaohongshu siteSession phase boundary', () => {
     });
 
     // Deliberately NOT converted (do not flip these without solving their
-    // documented hazard): feed/user/saved/liked read page state that goes
-    // stale on a warm tab; search replaces the session tab; the creator
+    // documented hazard): search replaces the session tab; the creator
     // capture trio needs navigation to fire signed XHRs; publish/delete-note
     // and the draft commands would inherit a dirty composer.
     const ephemeral = [
         'xiaohongshu/search',
-        'xiaohongshu/user',
-        'xiaohongshu/saved',
-        'xiaohongshu/liked',
-        'xiaohongshu/feed',
         'xiaohongshu/publish',
         'xiaohongshu/delete-note',
         'xiaohongshu/drafts',

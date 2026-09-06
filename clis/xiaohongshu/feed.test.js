@@ -124,3 +124,23 @@ describe('xiaohongshu/feed func', () => {
         expect(rows[0].url).toContain('xsec_token=note-token');
     });
 });
+
+describe('xiaohongshu/feed warm-tab freshness', () => {
+    it('forces a reload when the persistent tab already sits on /explore — the store must not be reread stale', async () => {
+        const command = getRegistry().get('xiaohongshu/feed');
+        const page = createPageMock({ items: [entry('n1')] });
+        page.getCurrentUrl = vi.fn().mockResolvedValue('https://www.xiaohongshu.com/explore');
+        const rows = await command.func(page, { limit: 1 });
+        expect(rows[0].id).toBe('n1');
+        expect(page.goto).not.toHaveBeenCalled();
+        expect(page.evaluate).toHaveBeenCalledWith('location.reload()');
+    });
+
+    it('navigates normally when the tab is elsewhere', async () => {
+        const command = getRegistry().get('xiaohongshu/feed');
+        const page = createPageMock({ items: [entry('n1')] });
+        page.getCurrentUrl = vi.fn().mockResolvedValue('https://www.xiaohongshu.com/user/profile/x');
+        await command.func(page, { limit: 1 });
+        expect(page.goto).toHaveBeenCalledWith('https://www.xiaohongshu.com/explore');
+    });
+});
