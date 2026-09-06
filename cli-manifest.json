@@ -46116,12 +46116,9 @@
     ],
     "columns": [
       "seq",
+      "kind",
       "nickname",
-      "user_id",
-      "msg",
-      "comment_type",
-      "fans_group",
-      "comment_id"
+      "msg"
     ],
     "type": "js",
     "modulePath": "xiaohongshu/live-comments.js",

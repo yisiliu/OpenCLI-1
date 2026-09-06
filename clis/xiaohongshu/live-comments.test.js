@@ -34,39 +34,113 @@ function makeRoomDom(initialComments) {
     return { win, run, touchChat };
 }
 
-describe('live-comments in-page watcher (real MutationObserver in JSDOM)', () => {
-    it('captures the initial store snapshot on install and drains it once', async () => {
-        const { run } = makeRoomDom([comment('c1', '这个咖啡机怎么卖')]);
+describe('live-comments in-page watcher v3 (DOM-sourced, real MutationObserver in JSDOM)', () => {
+    function chatItem(doc, nickname, msg, { notice = false } = {}) {
+        const item = doc.createElement('div');
+        item.className = 'virtual-list-item';
+        if (notice) {
+            item.innerHTML = '<div class="risk-text"><div class="risk-item"><span class="risk-tip">通知</span>' + msg + '</div></div>';
+            return item;
+        }
+        const wrapper = doc.createElement('div');
+        wrapper.className = 'msg-wrapper';
+        const content = doc.createElement('div');
+        content.className = 'msg-content';
+        const nick = doc.createElement('span');
+        nick.className = 'nickname';
+        nick.textContent = nickname;
+        content.appendChild(nick);
+        content.appendChild(doc.createTextNode(' ' + msg));
+        wrapper.appendChild(content);
+        item.appendChild(wrapper);
+        return item;
+    }
+
+    function makeRoom(initial = []) {
+        const dom = new JSDOM('<div class="live-chat"><div class="virtual-list"></div></div>', {
+            url: 'https://www.xiaohongshu.com/livestream/1',
+        });
+        const win = dom.window;
+        const list = win.document.querySelector('.virtual-list');
+        for (const [nick, msg, opts] of initial) list.appendChild(chatItem(win.document, nick, msg, opts));
+        const run = (script) => Function('window', 'document', 'MutationObserver', `return (${script})`)(
+            win, win.document, win.MutationObserver,
+        );
+        const addComment = async (nick, msg, opts) => {
+            list.appendChild(chatItem(win.document, nick, msg, opts));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        };
+        return { win, run, addComment };
+    }
+
+    it('captures the initial chat items on install and drains them once', () => {
+        const { run } = makeRoom([['晶晶', '这个咖啡机怎么卖']]);
         expect(run(buildLiveWatcherInstallJs())).toEqual({ installed: true, fresh: true });
         const first = run(buildLiveWatcherDrainJs());
-        expect(first.installed).toBe(true);
-        expect(first.items.map((i) => i.commentId)).toEqual(['c1']);
+        expect(first.items).toEqual([{ kind: 'chat', nickname: '晶晶', msg: '这个咖啡机怎么卖' }]);
         expect(run(buildLiveWatcherDrainJs()).items).toEqual([]);
     });
 
-    it('merges new store comments when the chat DOM mutates, deduped by commentId', async () => {
-        const { win, run, touchChat } = makeRoomDom([comment('c1', 'a')]);
+    it('captures comments appended after install — including identical repeated texts', async () => {
+        const { run, addComment } = makeRoom();
         run(buildLiveWatcherInstallJs());
-        run(buildLiveWatcherDrainJs());
-        // Virtual-list style churn: the store window slides, old + new coexist.
-        win.__INITIAL_STATE__.liveStream.comments._value = [comment('c1', 'a'), comment('c2', 'b')];
-        await touchChat();
+        await addComment('甲', '666');
+        await addComment('乙', '666');
+        await addComment('甲', '666');
         const drained = run(buildLiveWatcherDrainJs());
-        expect(drained.items.map((i) => i.commentId)).toEqual(['c2']);
+        expect(drained.items.map((i) => i.nickname + ':' + i.msg)).toEqual(['甲:666', '乙:666', '甲:666']);
     });
 
-    it('is idempotent: a second install keeps the buffer and reports fresh=false', async () => {
-        const { win, run, touchChat } = makeRoomDom([comment('c1', 'a')]);
+    it('classifies enter/like/notice events', async () => {
+        const { run, addComment } = makeRoom();
         run(buildLiveWatcherInstallJs());
-        win.__INITIAL_STATE__.liveStream.comments._value = [comment('c2', 'b')];
-        await touchChat();
-        expect(run(buildLiveWatcherInstallJs())).toEqual({ installed: true, fresh: false });
+        await addComment('路人', '来了');
+        await addComment('小可爱', '为主播点赞了');
+        await addComment('', '平台倡导文明健康的直播环境', { notice: true });
+        await addComment('丙', '主播加油');
         const drained = run(buildLiveWatcherDrainJs());
-        expect(drained.items.map((i) => i.commentId)).toEqual(['c1', 'c2']);
+        expect(drained.items.map((i) => i.kind)).toEqual(['enter', 'like', 'notice', 'chat']);
+        expect(drained.items[3]).toEqual({ kind: 'chat', nickname: '丙', msg: '主播加油' });
+    });
+
+    it('keeps capturing after the chat container node is replaced by the SPA', async () => {
+        const { win, run } = makeRoom([['甲', 'a']]);
+        run(buildLiveWatcherInstallJs());
+        run(buildLiveWatcherDrainJs());
+        const doc = win.document;
+        doc.querySelector('.live-chat').remove();
+        const fresh = doc.createElement('div');
+        fresh.className = 'live-chat';
+        fresh.innerHTML = '<div class="virtual-list"></div>';
+        doc.body.appendChild(fresh);
+        fresh.querySelector('.virtual-list').appendChild(chatItem(doc, '乙', 'b'));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const drained = run(buildLiveWatcherDrainJs());
+        expect(drained.items).toEqual([{ kind: 'chat', nickname: '乙', msg: 'b' }]);
+    });
+
+    it('drain performs a final sweep so items rendered without a caught mutation are never missed', () => {
+        const { win, run } = makeRoom([['甲', 'a']]);
+        run(buildLiveWatcherInstallJs());
+        run(buildLiveWatcherDrainJs());
+        // Appended synchronously with no microtask yield: observer callback never ran.
+        win.document.querySelector('.virtual-list').appendChild(chatItem(win.document, '乙', 'b'));
+        const drained = run(buildLiveWatcherDrainJs());
+        expect(drained.items).toEqual([{ kind: 'chat', nickname: '乙', msg: 'b' }]);
+    });
+
+    it('is idempotent for the current version and replaces outdated watchers', () => {
+        const { win, run } = makeRoom([['甲', 'a']]);
+        run(buildLiveWatcherInstallJs());
+        expect(run(buildLiveWatcherInstallJs())).toEqual({ installed: true, fresh: false });
+        win.__opencli_live_watch = { installed: true, v: 1, buf: [], observer: { disconnect: () => {} } };
+        expect(run(buildLiveWatcherInstallJs())).toEqual({ installed: true, fresh: true });
+        const drained = run(buildLiveWatcherDrainJs());
+        expect(drained.items).toEqual([{ kind: 'chat', nickname: '甲', msg: 'a' }]);
     });
 
     it('drain on a page without the watcher reports installed=false', () => {
-        const { run } = makeRoomDom([]);
+        const { run } = makeRoom();
         expect(run(buildLiveWatcherDrainJs())).toEqual({ installed: false, items: [] });
     });
 });
@@ -74,7 +148,7 @@ describe('live-comments in-page watcher (real MutationObserver in JSDOM)', () =>
 describe('xiaohongshu/live-comments command', () => {
     const getCommand = () => getRegistry().get('xiaohongshu/live-comments');
 
-    function makePage({ drains = [{ installed: true, items: [comment('c1', '好优雅', 'Joce1yn')] }], fresh = true } = {}) {
+    function makePage({ drains = [{ installed: true, items: [{ kind: 'chat', nickname: 'Joce1yn', msg: '好优雅' }] }], fresh = true } = {}) {
         let drainIndex = 0;
         return {
             goto: vi.fn().mockResolvedValue(undefined),
@@ -106,15 +180,7 @@ describe('xiaohongshu/live-comments command', () => {
     it('maps drained comments into rows', async () => {
         const page = makePage();
         const rows = await getCommand().func(page, { 'room-url': ROOM_URL, duration: 0 });
-        expect(rows).toEqual([{
-            seq: 1,
-            nickname: 'Joce1yn',
-            user_id: 'u-c1',
-            msg: '好优雅',
-            comment_type: 0,
-            fans_group: '毛毛拖鞋',
-            comment_id: 'c1',
-        }]);
+        expect(rows).toEqual([{ seq: 1, kind: 'chat', nickname: 'Joce1yn', msg: '好优雅' }]);
     });
 
     it('waits out --duration before draining', async () => {

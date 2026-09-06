@@ -49,14 +49,32 @@ export function buildSendVerifyJs(text) {
     return `
     (() => { // __send_verify
       const box = document.querySelector('.input-editable');
-      const cleared = !box || (box.innerText || '').trim() === '';
+      const cleared = !box || (box.textContent || '').trim() === '';
+      // Primary evidence: our own nickname + the exact text rendered in the
+      // chat DOM. The store echo is unreliable (the liveStream.comments store
+      // freezes after the SSR batch — observed live: real sends "failed"
+      // verification while the watcher saw them land in chat).
+      const userInfo = window.__INITIAL_STATE__?.user?.userInfo;
+      const ownNick = String((userInfo?._value ?? userInfo)?.nickname ?? '').trim();
+      const domHit = ownNick !== '' && [...document.querySelectorAll('.virtual-list-item')].some((item) => {
+        const nickEl = item.querySelector('.nickname');
+        if (!nickEl || (nickEl.textContent || '').trim() !== ownNick) return false;
+        const contentEl = item.querySelector('.msg-content') ?? item;
+        let msg = '';
+        for (const node of contentEl.childNodes) {
+          if (node === nickEl || (node.nodeType === 1 && node.contains(nickEl))) continue;
+          msg += node.textContent ?? '';
+        }
+        return msg.replace(/\s+/g, ' ').trim() === ${JSON.stringify(text)};
+      });
+      // Secondary: the store echo, when it happens, carries the server id.
       const ls = window.__INITIAL_STATE__?.liveStream;
       const raw = ls?.comments?._value ?? ls?.comments;
       const mine = (Array.isArray(raw) ? raw : [])
         .filter((c) => String(c?.msg ?? '') === ${JSON.stringify(text)})
         .map((c) => String(c?.commentId ?? ''))
         .filter(Boolean);
-      return { sent: cleared && mine.length > 0, cleared, commentId: mine[mine.length - 1] ?? '' };
+      return { sent: cleared && (domHit || mine.length > 0), cleared, commentId: mine[mine.length - 1] ?? '' };
     })()
   `;
 }
