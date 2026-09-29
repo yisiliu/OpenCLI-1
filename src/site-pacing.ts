@@ -24,8 +24,9 @@ export interface SitePacingRule {
 
 /**
  * Sites with documented velocity-based risk control. Bounds follow the
- * site's own pitfall docs (sitemaps/xiaohongshu/pitfalls.md: keep 1-2s
- * between consecutive requests).
+ * previously documented xiaohongshu operating rule of keeping 1-2s between
+ * consecutive requests (the sitemaps/ docs that recorded it were removed
+ * in #2539; the observed risk-control behavior stands).
  */
 export const SITE_PACING_RULES: Readonly<Record<string, SitePacingRule>> = {
   xiaohongshu: { minIntervalMs: 1500, maxIntervalMs: 3000 },
